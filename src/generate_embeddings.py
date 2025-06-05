@@ -54,5 +54,5 @@ for text in tqdm(df['cleaned_text'], total=len(df)):
 # Save embeddings
 df['embedding'] = embeddings
 df.to_csv("cleaned_incidents_with_embeddings.csv", index=False)
-print("✅ Embedding generation complete! Saved to cleaned_incidents_with_embeddings.csv")
+print("Embedding generation complete! Saved to cleaned_incidents_with_embeddings.csv")
 
