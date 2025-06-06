@@ -2,17 +2,18 @@ import re
 import faiss
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from openai import AzureOpenAI
 import os
 import requests
 import json
+from dotenv import load_dotenv
+from uuid import uuid4
 
 app = FastAPI()
 
 # Load environment variables
-from dotenv import load_dotenv
 load_dotenv()
 
 # Initialize Azure OpenAI client for embeddings
@@ -106,14 +107,28 @@ def recommend_resolution(request: SearchRequest):
 
     return {"recommendations": recommendations}
 
-# New endpoint for /ask-assistant
+# In-memory conversation memory store (for demo)
+conversation_memory = {}
+
+# New endpoint for /ask-assistant with memory and Azure Foundry call
 @app.post("/ask-assistant")
-async def ask_assistant(request: AskRequest):
-    # Step 1: Find similar incidents using semantic search
+async def ask_assistant(request: AskRequest, req: Request):
+    # Get or create session_id from header (client must send or first time gets new)
+    session_id = req.headers.get("x-session-id")
+    if not session_id:
+        session_id = str(uuid4())
+
+    # Load previous conversation history for session if any
+    history = conversation_memory.get(session_id, [])
+
+    # Append any new conversation history client sent (optional)
+    if request.conversation_history:
+        history.extend(request.conversation_history)
+
+    # Get similar incidents from FAISS
     query_embedding = get_embedding(request.question)
     _, indices = index.search(np.array([query_embedding]), request.top_k)
-    
-    # Prepare context from similar incidents
+
     context = []
     for idx in indices[0]:
         if idx == -1:
@@ -124,42 +139,32 @@ async def ask_assistant(request: AskRequest):
             "description": incident.get("Description", ""),
             "resolution": incident.get("Resolution", "")
         })
-    
-    # Prepare conversation history if provided
-    messages = []
-    if request.conversation_history:
-        messages.extend(request.conversation_history)
-    
-    # Add system message with context
+
+    # System message with incident context
     system_message = {
         "role": "system",
         "content": f"""You are a helpful IT support assistant. Use the following incident history as context:
-        
-        {json.dumps(context, indent=2)}
-        
-        Answer the user's question based on this context and your general knowledge.
-        """
+
+{json.dumps(context, indent=2)}
+
+Answer the user's question based on this context and your general knowledge.
+"""
     }
-    messages.insert(0, system_message)
-    
-    # Add user's question
-    messages.append({
-        "role": "user",
-        "content": request.question
-    })
-    
+
+    # Compose messages: system + history + user question
+    messages = [system_message] + history + [{"role": "user", "content": request.question}]
+
     # Call Azure Foundry API
     headers = {
         "Content-Type": "application/json",
         "api-key": FOUNDRY_API_KEY
     }
-    
     payload = {
         "messages": messages,
         "temperature": 0.7,
         "max_tokens": 500
     }
-    
+
     try:
         response = requests.post(
             FOUNDRY_ENDPOINT,
@@ -168,16 +173,20 @@ async def ask_assistant(request: AskRequest):
             timeout=30
         )
         response.raise_for_status()
-        
-        # Parse the response
         result = response.json()
         assistant_reply = result['choices'][0]['message']['content']
-        
+
+        # Save user question and assistant reply for memory (keep last 20 msgs)
+        history.append({"role": "user", "content": request.question})
+        history.append({"role": "assistant", "content": assistant_reply})
+        conversation_memory[session_id] = history[-20:]
+
         return {
+            "session_id": session_id,
             "answer": assistant_reply,
             "context_tickets": [incident["ticket_number"] for incident in context],
             "full_response": result
         }
-        
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=500, detail=f"Error calling Azure Foundry: {str(e)}")
+
