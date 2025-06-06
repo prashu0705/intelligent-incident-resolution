@@ -11,7 +11,16 @@ import json
 from dotenv import load_dotenv
 from uuid import uuid4
 
+from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # React dev server origin
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 # Load environment variables
 load_dotenv()
