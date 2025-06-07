@@ -10,8 +10,9 @@ import requests
 import json
 from dotenv import load_dotenv
 from uuid import uuid4
-
+from pathlib import Path
 from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -38,8 +39,16 @@ FOUNDRY_ENDPOINT = os.getenv("AZURE_FOUNDY_ENDPOINT")
 FOUNDRY_API_KEY = os.getenv("AZURE_FOUNDY_API_KEY")
 
 # Load FAISS index and DataFrame
-index = faiss.read_index("embeddings/incident_embeddings.index")
-df = pd.read_pickle("embeddings/incidents_with_embeddings.pkl")
+project_root = Path(__file__).parent.parent  # Goes up from src/ to project root
+index_path = project_root / "embeddings" / "incident_embeddings.index"
+print(f"Looking for index at: {index_path}")
+print(f"File exists: {index_path.exists()}")
+index = faiss.read_index(str(index_path))
+# index = faiss.read_index("../embeddings/incident_embeddings.index")
+df_path = project_root / "embeddings" / "incidents_with_embeddings.pkl"
+df = pd.read_pickle(str(df_path))
+
+# df = pd.read_pickle("embeddings/incidents_with_embeddings.pkl")
 
 # Request models
 class SearchRequest(BaseModel):
