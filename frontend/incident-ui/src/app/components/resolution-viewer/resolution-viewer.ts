@@ -4,8 +4,8 @@ import { Component } from '@angular/core';
   selector: 'app-resolution-viewer',
   imports: [],
   templateUrl: './resolution-viewer.html',
-  styleUrl: './resolution-viewer.scss'
+  styleUrls: ['./resolution-viewer.scss']
 })
-export class ResolutionViewer {
+export class ResolutionViewerComponent {
 
 }

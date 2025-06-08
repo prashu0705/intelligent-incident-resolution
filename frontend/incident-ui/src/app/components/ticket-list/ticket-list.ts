@@ -4,8 +4,8 @@ import { Component } from '@angular/core';
   selector: 'app-ticket-list',
   imports: [],
   templateUrl: './ticket-list.html',
-  styleUrl: './ticket-list.scss'
+  styleUrls: ['./ticket-list.scss']
 })
-export class TicketList {
+export class TicketListComponent {
 
 }
