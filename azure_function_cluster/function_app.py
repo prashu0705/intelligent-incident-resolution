@@ -1,0 +1,106 @@
+import azure.functions as func
+import logging
+import pandas as pd
+import pickle
+import os
+from sklearn.cluster import KMeans
+import json
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from dotenv import load_dotenv
+from pathlib import Path
+
+app = func.FunctionApp()
+
+# Locate root directory (parent of azure_function_cluster)
+root_dir = Path(__file__).resolve().parent.parent
+
+# Load .env from root directory
+load_dotenv(dotenv_path=root_dir / ".env")
+
+DATA_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "embeddings", "incidents_with_embeddings.pkl")
+)
+
+STATE_FILE = os.path.join(os.path.dirname(__file__), "cluster_state.json")
+
+def load_incidents():
+    with open(DATA_PATH, "rb") as f:
+        df = pickle.load(f)
+    return df
+
+def save_cluster_state(state):
+    with open(STATE_FILE, "w") as f:
+        json.dump(state, f)
+
+def load_cluster_state():
+    if not os.path.exists(STATE_FILE):
+        return {}
+    with open(STATE_FILE, "r") as f:
+        return json.load(f)
+
+def send_email_alert(subject, body):
+    sender_email = os.getenv("SENDER_EMAIL")
+    receiver_email = os.getenv("RECEIVER_EMAIL")
+    app_password = os.getenv("APP_PASSWORD")
+
+    if not all([sender_email, receiver_email, app_password]):
+        logging.error("Email credentials not found in environment variables")
+        return
+
+    msg = MIMEMultipart()
+    msg["From"] = sender_email
+    msg["To"] = receiver_email
+    msg["Subject"] = subject
+
+    msg.attach(MIMEText(body, "plain"))
+
+    try:
+        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+        server.login(sender_email, app_password)
+        server.sendmail(sender_email, receiver_email, msg.as_string())
+        server.quit()
+        logging.info("Alert email sent successfully.")
+    except Exception as e:
+        logging.error(f"Failed to send email: {str(e)}")
+
+@app.timer_trigger(schedule="0 */5 * * * *", arg_name="myTimer", run_on_startup=True, use_monitor=False)
+def RootCauseDetection(myTimer: func.TimerRequest) -> None:
+    if myTimer.past_due:
+        logging.warning("The timer is past due!")
+
+    logging.info("RootCauseDetection started")
+
+    df = load_incidents()
+
+    embeddings = df['embedding'].tolist()
+
+    n_clusters = 5
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+    labels = kmeans.fit_predict(embeddings)
+
+    df['cluster'] = labels
+
+    cluster_counts = df['cluster'].value_counts().to_dict()
+    logging.info(f"Current cluster counts: {cluster_counts}")
+
+    prev_counts = load_cluster_state()
+
+    alerts = []
+    for cluster_id, count in cluster_counts.items():
+        prev_count = prev_counts.get(str(cluster_id), 0)
+        if count > prev_count + 3:
+            alerts.append(f"Cluster {cluster_id} increased from {prev_count} to {count} incidents")
+
+    save_cluster_state({str(k): v for k, v in cluster_counts.items()})
+
+    if alerts:
+        for alert in alerts:
+            logging.warning(f"ALERT: {alert}")
+            send_email_alert("⚠️ Incident Cluster Alert", alert)
+    else:
+        logging.info("No significant cluster growth detected.")
+
+    logging.info("RootCauseDetection completed")
+

@@ -12,6 +12,7 @@ from uuid import uuid4
 from pathlib import Path
 from fastapi.middleware.cors import CORSMiddleware
 
+
 # Foundry SDK imports
 from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential
@@ -59,6 +60,9 @@ class AskRequest(BaseModel):
     conversation_history: list = None
     top_k: int = 3
 
+# ------------------ In-Memory Conversation Storage ------------------ #
+conversation_memory = {}
+
 # ------------------ Helper Functions ------------------ #
 def clean_text(text):
     if not isinstance(text, str):
@@ -76,7 +80,6 @@ def get_embedding(text: str):
     return np.array(response.data[0].embedding).astype('float32')
 
 # ------------------ Endpoints ------------------ #
-
 @app.post("/search-similar-incidents")
 async def search_similar_incidents(request: SearchRequest):
     query_text = clean_text(request.query)
@@ -96,6 +99,7 @@ async def search_similar_incidents(request: SearchRequest):
         })
 
     return {"results": results}
+
 
 @app.post("/recommend-resolution")
 def recommend_resolution(request: SearchRequest):
@@ -123,13 +127,11 @@ def recommend_resolution(request: SearchRequest):
 
     return {"recommendations": recommendations}
 
-# In-memory session memory
-conversation_memory = {}
-
 @app.post("/ask-assistant")
 async def ask_assistant(request: AskRequest, req: Request):
     session_id = req.headers.get("x-session-id") or str(uuid4())
     history = conversation_memory.get(session_id, [])
+
     if request.conversation_history:
         history.extend(request.conversation_history)
 
@@ -143,13 +145,12 @@ async def ask_assistant(request: AskRequest, req: Request):
         incident = df.iloc[idx]
         context.append({
             "ticket_number": incident.get("Ticket Number", "N/A"),
-            "description": incident.get("Description", ""),
-            "resolution": incident.get("Resolution", "")
+            "combined_text": incident.get("combined_text", "")
         })
 
     system_context = f"""You are a helpful IT support assistant. Use this incident history as context:\n\n{json.dumps(context, indent=2)}"""
 
-    # New thread each time (for now)
+    # Create a new thread for this question
     thread = project.agents.threads.create()
 
     project.agents.messages.create(
@@ -166,19 +167,27 @@ async def ask_assistant(request: AskRequest, req: Request):
     if run.status == "failed":
         raise HTTPException(status_code=500, detail=f"Agent run failed: {run.last_error}")
 
-    messages = project.agents.messages.list(thread_id=thread.id, order=ListSortOrder.ASCENDING)
+    messages = list(project.agents.messages.list(thread_id=thread.id, order=ListSortOrder.ASCENDING))
+
     assistant_reply = next(
-        (m.text_messages[-1].text.value for m in reversed(messages) if m.role == "assistant" and m.text_messages),
+        (
+            m.text_messages[-1].text.value
+             for m in reversed(messages)
+            if m.role == "assistant" and m.text_messages
+        ),
         "No response from agent"
     )
 
     history.append({"role": "user", "content": request.question})
     history.append({"role": "assistant", "content": assistant_reply})
-    conversation_memory[session_id] = history[-20:]
+
+    # Keep only last 100 turns per session
+    conversation_memory[session_id] = history[-100:]
 
     return {
         "session_id": session_id,
         "answer": assistant_reply,
         "context_tickets": [incident["ticket_number"] for incident in context],
+        "chat_history": conversation_memory[session_id]
     }
 
