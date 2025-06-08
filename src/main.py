@@ -190,4 +190,78 @@ async def ask_assistant(request: AskRequest, req: Request):
         "context_tickets": [incident["ticket_number"] for incident in context],
         "chat_history": conversation_memory[session_id]
     }
+@app.post("/auto-classify-ticket")
+async def auto_classify_ticket(request: SearchRequest):
+    prompt = f"""
+You are an IT assistant. Based on the following incident description, suggest:
+1. Likely category
+2. Expected severity
+3. Suggested priority
+
+Incident: "{request.query}"
+"""
+    thread = project.agents.threads.create()
+    project.agents.messages.create(thread_id=thread.id, role="user", content=prompt)
+    run = project.agents.runs.create_and_process(thread_id=thread.id, agent_id=agent_id)
+
+    if run.status == "failed":
+        raise HTTPException(status_code=500, detail="Agent run failed")
+
+    messages = list(project.agents.messages.list(thread_id=thread.id, order=ListSortOrder.ASCENDING))
+    reply = next(
+        (m.text_messages[-1].text.value for m in reversed(messages)
+         if m.role == "assistant" and m.text_messages),
+        "No response from agent"
+    )
+    return {"classification": reply}
+
+
+@app.get("/generate-resolution-summary")
+async def generate_resolution_summary(ticket_number: str):
+    row = df[df["Ticket Number"] == ticket_number]
+    if row.empty:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    raw_text = row.iloc[0]["combined_text"]
+    prompt = f"Summarize this IT incident resolution in 2-3 sentences:\n\n{raw_text}"
+
+    thread = project.agents.threads.create()
+    project.agents.messages.create(thread_id=thread.id, role="user", content=prompt)
+    run = project.agents.runs.create_and_process(thread_id=thread.id, agent_id=agent_id)
+
+    if run.status == "failed":
+        raise HTTPException(status_code=500, detail="Agent run failed")
+
+    messages = list(project.agents.messages.list(thread_id=thread.id, order=ListSortOrder.ASCENDING))
+    reply = next(
+        (m.text_messages[-1].text.value for m in reversed(messages)
+         if m.role == "assistant" and m.text_messages),
+        "No summary generated"
+    )
+    return {"summary": reply}
+
+
+@app.get("/rewrite-resolution-instructions")
+async def rewrite_resolution_instructions(ticket_number: str):
+    row = df[df["Ticket Number"] == ticket_number]
+    if row.empty:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    raw_text = row.iloc[0]["combined_text"]
+    prompt = f"""Rewrite the following resolution steps as a numbered list of clear instructions suitable for an L1 IT engineer to follow:\n\n{raw_text}"""
+
+    thread = project.agents.threads.create()
+    project.agents.messages.create(thread_id=thread.id, role="user", content=prompt)
+    run = project.agents.runs.create_and_process(thread_id=thread.id, agent_id=agent_id)
+
+    if run.status == "failed":
+        raise HTTPException(status_code=500, detail="Agent run failed")
+
+    messages = list(project.agents.messages.list(thread_id=thread.id, order=ListSortOrder.ASCENDING))
+    reply = next(
+        (m.text_messages[-1].text.value for m in reversed(messages)
+         if m.role == "assistant" and m.text_messages),
+        "No response generated"
+    )
+    return {"instructions": reply}
 
