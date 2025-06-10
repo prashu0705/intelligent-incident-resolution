@@ -1,3 +1,17 @@
+"""
+Azure Function for scheduled incident clustering and alert generation.
+
+This Function App is triggered on a timer schedule. It performs the following:
+1. Loads incident data with pre-computed embeddings from a pickle file.
+2. Clusters recent incidents using HDBSCAN to identify emerging trends.
+3. Compares current cluster sizes with previously stored state.
+4. If significant growth is detected in any cluster, an email alert is sent.
+5. Saves the current cluster state (including counts and representative details) for the next run.
+
+Environment variables for email (SENDER_EMAIL, RECEIVER_EMAIL, APP_PASSWORD)
+must be configured in the Azure Function App settings or local .env file.
+The .env file is expected to be in the root directory of the project.
+"""
 import azure.functions as func
 import logging
 import pandas as pd
@@ -89,7 +103,15 @@ def RootCauseDetection(myTimer: func.TimerRequest) -> None:
 
     alerts = []
     for cluster_id, count in cluster_counts.items():
-        prev_count = prev_counts.get(str(cluster_id), 0)
+        # Get the data for the cluster_id from prev_counts
+        prev_data_for_cluster = prev_counts.get(str(cluster_id))
+
+        prev_count = 0 # Default previous count
+        if isinstance(prev_data_for_cluster, int):
+            prev_count = prev_data_for_cluster
+        # If prev_data_for_cluster is not an int (e.g. dict from an old format, None, etc.),
+        # prev_count remains 0. This handles the TypeError if it was e.g. a dict.
+        
         if count > prev_count + 3:
             alerts.append(f"Cluster {cluster_id} increased from {prev_count} to {count} incidents")
 
@@ -103,4 +125,5 @@ def RootCauseDetection(myTimer: func.TimerRequest) -> None:
         logging.info("No significant cluster growth detected.")
 
     logging.info("RootCauseDetection completed")
+
 

@@ -8,15 +8,79 @@
   
   <mat-card-content>
     <div class="chat-container">
-      <div *ngFor="let message of messages" 
-           [class.user-message]="message.isUser"
-           [class.loading]="message.loading"
-           class="message">
-        <div class="message-content">
-          <mat-icon *ngIf="message.isUser">person</mat-icon>
-          <mat-icon *ngIf="!message.isUser && !message.loading">smart_toy</mat-icon>
-          <mat-spinner *ngIf="message.loading" diameter="20"></mat-spinner>
-          <div>{{ message.text }}</div>
+      <div *ngFor="let message of messages" class="message-row">
+        <div [ngSwitch]="message.type"
+             [class.user-message]="message.isUser"
+             class="message">
+
+          <!-- Text Message or Basic Loading Message -->
+          <ng-container *ngSwitchCase="'text'">
+            <div class="message-content">
+              <mat-icon *ngIf="message.isUser">person</mat-icon>
+              <mat-icon *ngIf="!message.isUser">smart_toy</mat-icon>
+              <div class="message-text">{{ message.text }}</div>
+            </div>
+          </ng-container>
+
+          <ng-container *ngSwitchCase="'loading'">
+             <div class="message-content">
+                <mat-icon>smart_toy</mat-icon>
+                <mat-spinner diameter="20" class="loading-spinner"></mat-spinner>
+                <div class="message-text">{{ message.text }}</div>
+             </div>
+          </ng-container>
+
+          <!-- Similar Incidents -->
+          <ng-container *ngSwitchCase="'similar_incidents'">
+            <div class="message-content structured-message">
+              <mat-icon>smart_toy</mat-icon>
+              <div class="message-text">
+                <strong>{{ message.text }}</strong>
+                <mat-list *ngIf="message.data && message.data.length > 0">
+                  <mat-list-item *ngFor="let item of message.data" class="structured-item">
+                    <mat-card class="structured-card">
+                      <mat-card-header>
+                        <mat-card-title>Ticket: {{ item.incident['Ticket Number'] }}</mat-card-title>
+                        <mat-card-subtitle>Similarity Distance: {{ item.distance.toFixed(4) }}</mat-card-subtitle>
+                      </mat-card-header>
+                      <mat-card-content>
+                        <p class="incident-summary">
+                          {{ item.incident.Summary || item.incident.cleaned_text || item.incident.combined_text || 'No summary available.' | slice:0:250 }}
+                          <span *ngIf="(item.incident.Summary || item.incident.cleaned_text || item.incident.combined_text)?.length > 250">...</span>
+                        </p>
+                      </mat-card-content>
+                    </mat-card>
+                  </mat-list-item>
+                </mat-list>
+                <em *ngIf="!message.data || message.data.length === 0">No similar incidents found.</em>
+              </div>
+            </div>
+          </ng-container>
+
+          <!-- Recommended Resolutions -->
+          <ng-container *ngSwitchCase="'recommended_resolutions'">
+            <div class="message-content structured-message">
+              <mat-icon>smart_toy</mat-icon>
+              <div class="message-text">
+                <strong>{{ message.text }}</strong>
+                <mat-list *ngIf="message.data && message.data.length > 0">
+                  <mat-list-item *ngFor="let item of message.data" class="structured-item">
+                     <mat-card class="structured-card">
+                        <mat-card-header>
+                            <mat-card-title>From Ticket: {{ item.ticket }}</mat-card-title>
+                            <mat-card-subtitle>Source: {{ item.source_of_resolution }}</mat-card-subtitle>
+                        </mat-card-header>
+                        <mat-card-content>
+                            <p>{{ item.suggested_resolution }}</p>
+                        </mat-card-content>
+                     </mat-card>
+                  </mat-list-item>
+                </mat-list>
+                <em *ngIf="!message.data || message.data.length === 0">No specific recommendations found.</em>
+              </div>
+            </div>
+          </ng-container>
+
         </div>
       </div>
     </div>

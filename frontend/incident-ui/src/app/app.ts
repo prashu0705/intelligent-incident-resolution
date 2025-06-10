@@ -1,50 +1,25 @@
-import { Component, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
+// FormsModule is not directly used by AppComponent anymore, but AssistantChatComponent might import it itself.
+// If AssistantChatComponent is standalone and imports FormsModule, this import here might be redundant.
+// However, keeping it doesn't harm if other future direct uses in AppComponent template arise.
 import { FormsModule } from '@angular/forms';
+import { AssistantChatComponent } from './components/assistant-chat/assistant-chat';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [
+    CommonModule,
+    FormsModule, // Keep for now, AssistantChatComponent is standalone and should import what it needs.
+    AssistantChatComponent // Import the AssistantChatComponent
+  ],
   templateUrl: './app.html',
   styleUrls: ['./app.scss'],
 })
-export class AppComponent implements AfterViewChecked {
-  userInput = '';
-  loading = false;
-  messages: { text: string; type: 'user' | 'bot' }[] = [];
-
-  @ViewChild('chatBox') chatBox!: ElementRef;
-
-  sendMessage() {
-    const question = this.userInput.trim();
-    if (!question) return;
-
-    this.messages.push({ text: question, type: 'user' });
-    this.userInput = '';
-    this.loading = true;
-
-    fetch('http://localhost:8000/ask-assistant', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question })
-    })
-      .then(res => res.json())
-      .then(data => {
-        this.messages.push({ text: data.answer || 'No answer returned.', type: 'bot' });
-      })
-      .catch(() => {
-        this.messages.push({ text: 'Failed to connect to backend.', type: 'bot' });
-      })
-      .finally(() => {
-        this.loading = false;
-      });
-  }
-
-  ngAfterViewChecked() {
-    if (this.chatBox) {
-      this.chatBox.nativeElement.scrollTop = this.chatBox.nativeElement.scrollHeight;
-    }
-  }
+export class AppComponent {
+  // All old chat-related properties and methods are removed.
+  // AppComponent might have other application-wide logic or properties in a larger app.
+  // For this subtask, it becomes very minimal.
 }
 

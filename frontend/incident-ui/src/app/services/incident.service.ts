@@ -24,15 +24,22 @@ export class IncidentService {
     });
   }
 
-  askAssistant(question: string, history: any[] = [], sessionId: string | null = null): Observable<any> {
+  askAssistant(
+    question: string,
+    conversationHistory: Array<{role: string, content: string}> = [],
+    sessionId: string | null = null
+  ): Observable<any> {
+    let headers: {[header: string]: string | string[]} = {
+      'Content-Type': 'application/json'
+    };
+
+    if (sessionId) {
+      headers['X-Session-Id'] = sessionId;
+    }
+
     return this.http.post(`${this.apiUrl}/ask-assistant`, {
       question,
-      conversation_history: history,
-      session_id: sessionId
-    }, {
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
+      conversation_history: conversationHistory // Ensure this matches backend Pydantic model
+    }, { headers });
   }
 }

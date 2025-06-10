@@ -1,20 +1,9 @@
+<!--
+  The .chat-wrapper and potentially other global layout classes
+  are expected to be in app.scss or styles.scss to position the <app-assistant-chat>
+  component on the page. The <app-assistant-chat> component itself provides the chat card UI.
+-->
 <div class="chat-wrapper">
-  <div class="chat-card">
-    <div class="chat-header">
-      <h2> L1 Agent Assistant</h2>
-    </div>
-
-    <div class="chat-box" #chatBox>
-      <div *ngFor="let msg of messages" class="message" [ngClass]="msg.type">
-        <span>{{ msg.text }}</span>
-      </div>
-      <div *ngIf="loading" class="message bot loading">...</div>
-    </div>
-
-    <div class="chat-input">
-      <input [(ngModel)]="userInput" (keydown.enter)="sendMessage()" placeholder="Ask something..." />
-      <button (click)="sendMessage()" [disabled]="loading || !userInput.trim()">Send</button>
-    </div>
-  </div>
+  <app-assistant-chat></app-assistant-chat>
 </div>
 

@@ -1,0 +1,138 @@
+/* General message styling */
+.message-row {
+  margin-bottom: 10px;
+  display: flex; /* For aligning user messages to the right */
+}
+
+.message {
+  padding: 10px;
+  border-radius: 8px;
+  max-width: 90%; /* Max width for messages */
+  display: inline-block; /* To make width fit content up to max-width */
+  word-wrap: break-word; /* Ensure long words don't overflow */
+
+  &.user-message {
+    background-color: #e1f5fe; /* Light blue for user */
+    color: #333;
+    margin-left: auto; /* Align to the right */
+    .message-content {
+      flex-direction: row-reverse; /* Icon after text for user */
+      mat-icon {
+        margin-left: 8px;
+        margin-right: 0;
+      }
+    }
+  }
+
+  &:not(.user-message) {
+    background-color: #f1f1f1; /* Light grey for assistant */
+    color: #333;
+    margin-right: auto; /* Align to the left */
+     .message-content mat-icon {
+        margin-right: 8px;
+     }
+  }
+}
+
+.message-content {
+  display: flex;
+  align-items: center; /* Vertically center icon and text */
+
+  .message-text {
+    flex-grow: 1; /* Text takes available space */
+    padding-left: 5px; /* Add some space if icon is present */
+    padding-right: 5px;
+  }
+
+  mat-icon {
+    font-size: 24px; /* Consistent icon size */
+    flex-shrink: 0; /* Prevent icon from shrinking */
+  }
+
+  .loading-spinner {
+    margin-right: 8px; /* Space between spinner and "Thinking..." */
+  }
+}
+
+
+/* Styling for structured messages (similar incidents, recommendations) */
+.structured-message {
+  width: 100%; /* Take full available width in the message bubble */
+
+  .message-text strong { /* Title of the structured message part */
+    display: block;
+    margin-bottom: 8px;
+    font-size: 1.05em;
+  }
+}
+
+.structured-item {
+  margin-bottom: 10px; /* Space between items in a list */
+  padding: 0 !important; /* Override default mat-list-item padding */
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.structured-card {
+  width: 100%; /* Card takes full width of the list item */
+  background-color: #ffffff; /* White background for cards */
+  border: 1px solid #e0e0e0; /* Light border for cards */
+  box-shadow: none; /* Remove default mat-card shadow */
+
+  mat-card-header {
+    padding: 10px; /* Adjust padding */
+  }
+  mat-card-title {
+    font-size: 0.95em; /* Slightly smaller title for cards */
+    margin-bottom: 4px; /* Space below title */
+  }
+  mat-card-subtitle {
+    font-size: 0.85em;
+  }
+  mat-card-content {
+    font-size: 0.9em;
+    padding: 0 10px 10px 10px; /* Adjust padding */
+    p {
+      margin-bottom: 5px; /* Space between paragraphs in card content */
+    }
+    .incident-summary {
+        max-height: 100px; /* Limit height of summary */
+        overflow-y: auto;  /* Allow scrolling for longer summaries */
+        padding-right: 5px; /* Avoid scrollbar overlapping text */
+        background-color: #f9f9f9; /* Slightly different background for summary block */
+        border-radius: 4px;
+        padding: 8px;
+    }
+  }
+}
+
+/* Ensure chat container scrolls */
+.chat-card {
+  display: flex;
+  flex-direction: column;
+  height: 80vh; /* Example height, adjust as needed */
+}
+
+mat-card-content {
+  flex-grow: 1; /* Allows content to expand */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Prevents content from overflowing card */
+}
+
+.chat-container {
+  flex-grow: 1; /* Takes available vertical space */
+  overflow-y: auto; /* Enables scrolling for messages */
+  padding: 10px;
+  border: 1px solid #ccc;
+  margin-bottom: 10px;
+  background-color: #fafafa; /* Light background for chat area */
+}
+
+/* Input field styling */
+.query-input {
+  width: 100%;
+  margin-top: auto; /* Pushes input to the bottom */
+}
